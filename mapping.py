@@ -119,7 +119,7 @@ def main():
     df.to_csv('nonfiltered.tsv', sep='\t') 
 
     #filter out the data with the error bigger than the tolerance
-    df = df[new_df.Error < errorTolerance  ]
+    df = df[df.Error < errorTolerance  ]
     df.to_csv('output.tsv', sep='\t') 
 
 
