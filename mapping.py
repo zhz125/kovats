@@ -6,12 +6,13 @@ import pandas as pd
 import argparse
 
 
+
 # load df from input data file
 def loadDf(csv,cosine,markerDic,lib):
     df = pd.read_csv(csv,sep = '\t')
     new_df = pd.DataFrame({'CAS': df['CAS_Number'],'Name':df['Compound_Name'],
                            'Cosine':df['MQScore'], 'INCHI':df['INCHI'],
-                            'ki_real':np.nan,'ki_estimate':np.nan,'ki_average':np.nan,
+                           'ki_real':np.nan,'ki_estimate':np.nan,'ki_average':np.nan,
                            'TIC': df['TIC_Query'],'RT':df['RT_Query'],'Error':np.nan})
     
     # filter out by cosine score first
@@ -35,7 +36,7 @@ def loadDf(csv,cosine,markerDic,lib):
     #fill in the kovat index from the library search
     for i in range(len(new_df)):
         print(float(i)/float(len(new_df)))
-        kiList = libSearch(lib,new_df['CAS'][i],new_df['Name'][i])
+        kiList = libSearch(lib,new_df['INCHI'][i])
         if len(kiList) != 0:           
             new_df['ki_real'][i] = ";".join(kiList)
             new_df['ki_estimate'][i] =kovatIndex(float(new_df['RT'][i]), markerDic)
@@ -45,13 +46,14 @@ def loadDf(csv,cosine,markerDic,lib):
 
 
 # do a general search with name and CAS numbers
-def libSearch (lib,CAS, Name):
+def libSearch (lib,inchi):
+    #add using smiles to find the molecules in rdkit all its names
     kis = []
     enter = False
     for i in range(len(lib)):
         if 'non-polar' in lib['polarity'][i]:
             # taking too long
-            if lib['name'][i] ==  lib['name'][i]:
+            '''if lib['name'][i] ==  lib['name'][i]:
                 if lib['name'][i] == Name:
                     kis.append(str(lib['ki'][i]))
             if lib['CAS numbers'][i] == lib['CAS numbers'][i] and CAS == CAS:
@@ -59,7 +61,12 @@ def libSearch (lib,CAS, Name):
                     kis.append(str(lib['ki'][i]))
                     enter =True
                 elif enter:
-                    break
+                    break'''
+            #replace by comparing inchi
+            if lib['INCHI'][i] ==  lib['INCHI'][i]:
+                if lib['INCHI'][i] == inchi:
+                    kis.append(str(lib['ki'][i]))
+
     return kis
 
 def loadMarkers(marker):
@@ -107,11 +114,10 @@ def main():
 
     # load library 
     # library is sorted by CAS
-    lib = pd.read_csv('Kovatlib.csv')
+    lib = pd.read_csv('compeleteLib.csv')
 
     # load markers
     markerDic = loadMarkers(marker)
-    print( markerDic)
 
 
     #LoadDataframe and trim it to be the one we need
@@ -119,7 +125,7 @@ def main():
     df.to_csv('nonfiltered.tsv', sep='\t') 
 
     #filter out the data with the error bigger than the tolerance
-    df = df[df.Error < errorTolerance  ]
+    df = df[df.Error < errorTolerance]
     df.to_csv('output.tsv', sep='\t') 
 
 
