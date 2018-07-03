@@ -1,3 +1,17 @@
+# -*- coding: utf-8 -*-
+"""Kovat Index Filter
+This file is used to filter out the compounds with bad retention Queries.
+
+Example
+-------
+    $ python mapping.py input.csv carbonMarker.csv cosineScore(float) errorTolerance(float)
+
+
+Notes
+-----
+Run it with kovatLib.csv in the same directory.
+"""
+
 import sys
 import os
 import csv 
@@ -8,11 +22,11 @@ import argparse
 
 
 # load df from input data file
-def loadDf(csv,cosine,markerDic,lib):
+def loadDf(csv,cosine,markerDic):
     df = pd.read_csv(csv,sep = '\t')
     new_df = pd.DataFrame({'CAS': df['CAS_Number'],'Name':df['Compound_Name'],
                            'Cosine':df['MQScore'], 'INCHI':df['INCHI'],
-                           'ki_real':np.nan,'ki_estimate':np.nan,'ki_average':np.nan,
+                           'ki_estimate':np.nan,'ki_average':np.nan,
                            'TIC': df['TIC_Query'],'RT':df['RT_Query'],'Error':np.nan})
     
     # filter out by cosine score first
@@ -33,41 +47,22 @@ def loadDf(csv,cosine,markerDic,lib):
     new_df = new_df.drop(i for i in toDrop)
     new_df = new_df.reset_index(drop=True)
 
+    # load database:
+    # library is sorted by CAS
+    lib_df = pd.read_csv('completedwithaverage.csv')
+    lib_df = lib_df[lib_df.polarity.str.contains('non-polar')]
+    lib = pd.Series(lib_df.ki_nonpolar_average.values,index=lib_df.INCHI.values).to_dict()
+
     #fill in the kovat index from the library search
     for i in range(len(new_df)):
-        print(float(i)/float(len(new_df)))
-        kiList = libSearch(lib,new_df['INCHI'][i])
-        if len(kiList) != 0:           
-            new_df['ki_real'][i] = ";".join(kiList)
+        print(float(i)/float(len(new_df)))  
+        try:
+            new_df['ki_average'][i] = lib[new_df['INCHI'][i]]       
             new_df['ki_estimate'][i] =kovatIndex(float(new_df['RT'][i]), markerDic)
-            new_df['ki_average'][i] = sum(float(i) for i in kiList)/float(len(kiList))
-            new_df['Error'][i] = abs(new_df['ki_estimate'][i] - new_df['ki_average'][i])/new_df['ki_average'][i]       
+            new_df['Error'][i] = abs(new_df['ki_estimate'][i] - new_df['ki_average'][i])/new_df['ki_average'][i]
+        except:
+            continue       
     return new_df
-
-
-# do a general search with name and CAS numbers
-def libSearch (lib,inchi):
-    #add using smiles to find the molecules in rdkit all its names
-    kis = []
-    enter = False
-    for i in range(len(lib)):
-        if 'non-polar' in lib['polarity'][i]:
-            # taking too long
-            '''if lib['name'][i] ==  lib['name'][i]:
-                if lib['name'][i] == Name:
-                    kis.append(str(lib['ki'][i]))
-            if lib['CAS numbers'][i] == lib['CAS numbers'][i] and CAS == CAS:
-                if lib['CAS numbers'][i] == CAS.replace("-", ""):
-                    kis.append(str(lib['ki'][i]))
-                    enter =True
-                elif enter:
-                    break'''
-            #replace by comparing inchi
-            if lib['INCHI'][i] ==  lib['INCHI'][i]:
-                if lib['INCHI'][i] == inchi:
-                    kis.append(str(lib['ki'][i]))
-
-    return kis
 
 def loadMarkers(marker):
     df = pd.read_csv(marker,sep = ';')
@@ -88,7 +83,6 @@ def kovatIndex(rt, markerDic):
              or (rt == markerDic.RT_Query[i] or rt ==  markerDic.RT_Query[i+1]):
             N,n,tr_N,tr_n = markerDic['Compound_Name'][i+1],markerDic['Compound_Name'][i], \
                            markerDic.RT_Query[i+1],markerDic.RT_Query[i]
-            print(N,n,tr_N,tr_n,rt)
             ki_estimate = 100.0*(n+(N-n)*(rt-tr_n)/(tr_N - tr_n))
             return ki_estimate
              
@@ -97,9 +91,6 @@ def kovatIndex(rt, markerDic):
     
     
 def main():
-    # This file is used to filter out the compounds with bad retention Queries
-    # Run it with kovatLib.csv in the same directory.
-    # python mapping.py input.csv carbonMarker.csv cosineScore(float) errorTolerance(float)
     # parse the argument
     parser = argparse.ArgumentParser(description='run mapping')
     parser.add_argument('input', help='input')
@@ -112,26 +103,18 @@ def main():
     cosineScore = float(args.cosineScore)
     errorTolerance = float(args.errorTolerance)
 
-    # load library 
-    # library is sorted by CAS
-    lib = pd.read_csv('compeleteLib.csv')
 
     # load markers
     markerDic = loadMarkers(marker)
 
 
     #LoadDataframe and trim it to be the one we need
-    df = loadDf(inputF,cosineScore,markerDic,lib)
+    df = loadDf(inputF,cosineScore,markerDic)
     df.to_csv('nonfiltered.tsv', sep='\t') 
 
     #filter out the data with the error bigger than the tolerance
     df = df[df.Error < errorTolerance]
     df.to_csv('output.tsv', sep='\t') 
-
-
-    
-
-
         
 
 if __name__=="__main__":
