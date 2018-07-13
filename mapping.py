@@ -24,7 +24,8 @@ import argparse
 # load df from input data file
 def loadDf(csv,cosine,markerDic):
     df = pd.read_csv(csv,sep = '\t')
-    new_df = pd.DataFrame({'CAS': df['CAS_Number'],'Name':df['Compound_Name'],
+    new_df = pd.DataFrame({'#Scan#':df['#Scan#'],	
+                           'CAS': df['CAS_Number'],'Name':df['Compound_Name'],
                            'Cosine':df['MQScore'], 'INCHI':df['INCHI'],
                            'ki_estimate':np.nan,'ki_average':np.nan,
                            'TIC': df['TIC_Query'],'RT':df['RT_Query'],'Error':np.nan})
